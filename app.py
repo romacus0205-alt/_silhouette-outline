@@ -16,7 +16,7 @@ import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 from ultralytics import YOLO
 
-YOLO_MODEL_NAME = "yolov8n-seg.pt"  # 무료 서버 CPU 기준, nano 모델 권장
+YOLO_MODEL_NAME = "yolov8s-seg.pt"  # 무료 서버 CPU 기준, nano 모델 권장
 
 OUTLINE_COLOR = (0, 255, 0)      # BGR
 OUTLINE_BORDER = (0, 0, 0)
