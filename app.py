@@ -16,11 +16,11 @@ import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 from ultralytics import YOLO
 
-YOLO_MODEL_NAME = "yolov8s-seg.pt"  # nano보다 정확하지만 무료 서버에서 더 느릴 수 있음
+YOLO_MODEL_NAME = "yolov8s-seg.pt"  # 원본 VSCode 스크립트와 동일한 모델
 
-# --- 속도 개선 설정 ---
-PROCESS_EVERY_N_FRAMES = 3   # 3프레임마다 1번만 YOLO 추론 (나머지는 직전 결과 재사용)
-INFER_IMG_SIZE = 384         # YOLO에 넣는 이미지 크기 (기본 640 -> 384로 축소, 화면 해상도는 그대로)
+# --- 원본 스크립트와 동일하게: 매 프레임 처리, 기본 추론 해상도(640) 사용 ---
+PROCESS_EVERY_N_FRAMES = 1   # 프레임 스킵 없이 매번 추론 (원본과 동일)
+INFER_IMG_SIZE = 640         # YOLO 기본 추론 해상도 (원본과 동일)
 
 OUTLINE_COLOR = (0, 255, 0)      # BGR
 OUTLINE_BORDER = (0, 0, 0)
