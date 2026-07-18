@@ -21,7 +21,7 @@ from ultralytics import YOLO
 YOLO_MODEL_NAME = "yolov8n-seg.pt"  # 가장 가벼운 모델, 속도 최우선
 
 # --- 속도 개선 설정 (속도 최우선, 최대치) ---
-PROCESS_EVERY_N_FRAMES = 4   # 4프레임마다 1번 추론 (버벅임 완화)
+PROCESS_EVERY_N_FRAMES = 10  # 10프레임마다 1번 추론 (버벅임 최소화)
 INFER_IMG_SIZE = 640         # YOLO 기본 추론 해상도로 복원
 
 OUTLINE_COLOR = (0, 255, 0)      # BGR
@@ -142,7 +142,7 @@ ctx = webrtc_streamer(
     video_processor_factory=SilhouetteProcessor,
     rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={
-        "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
+        "video": {"width": {"ideal": 1280}, "height": {"ideal": 720}},
         "audio": False,
     },
 )
