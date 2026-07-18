@@ -16,11 +16,7 @@ import streamlit as st
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 from ultralytics import YOLO
 
-YOLO_MODEL_NAME = "yolov8n-seg.pt"  # 가장 가벼운 모델, 속도 최우선
-
-# --- 속도 개선 설정 (속도 최우선) ---
-PROCESS_EVERY_N_FRAMES = 5   # 5프레임마다 1번만 YOLO 추론
-INFER_IMG_SIZE = 256         # YOLO 입력 해상도를 크게 축소 (작은 물체 인식은 떨어질 수 있음)
+YOLO_MODEL_NAME = "yolov8n-seg.pt"  # 무료 서버 CPU 기준, nano 모델 권장
 
 OUTLINE_COLOR = (0, 255, 0)      # BGR
 OUTLINE_BORDER = (0, 0, 0)
@@ -60,16 +56,14 @@ class SilhouetteProcessor(VideoProcessorBase):
     def __init__(self):
         self.conf_percent = 50
         self.curve_smooth = 9
-        self.frame_count = 0
-        self.last_overlays = []  # 직전 추론 결과(그릴 항목들) 캐시
 
-    def _compute_overlays(self, img):
-        """YOLO 추론을 돌려서 그릴 항목 리스트를 만든다."""
+    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
+        img = frame.to_ndarray(format="bgr24")
+        display = img.copy()
         conf_threshold = max(int(self.conf_percent), 1) / 100.0
-        results = model.predict(source=img, conf=conf_threshold,
-                                 imgsz=INFER_IMG_SIZE, verbose=False)
 
-        overlays = []
+        results = model.predict(source=img, conf=conf_threshold, verbose=False)
+
         if len(results) > 0 and results[0].masks is not None:
             result = results[0]
             names = result.names
@@ -85,37 +79,22 @@ class SilhouetteProcessor(VideoProcessorBase):
                     continue
 
                 smoothed = smooth_closed_contour(polygon, int(self.curve_smooth))
+
+                cv2.polylines(display, [smoothed], isClosed=True,
+                              color=OUTLINE_BORDER, thickness=BORDER_THICKNESS,
+                              lineType=cv2.LINE_AA)
+                cv2.polylines(display, [smoothed], isClosed=True,
+                              color=OUTLINE_COLOR, thickness=INNER_THICKNESS,
+                              lineType=cv2.LINE_AA)
+
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 text = f"{label} {conf * 100:.0f}%"
-                overlays.append((smoothed, text, x1, y1))
-
-        return overlays
-
-    def _draw_overlays(self, display, overlays):
-        for smoothed, text, x1, y1 in overlays:
-            cv2.polylines(display, [smoothed], isClosed=True,
-                          color=OUTLINE_BORDER, thickness=BORDER_THICKNESS,
-                          lineType=cv2.LINE_AA)
-            cv2.polylines(display, [smoothed], isClosed=True,
-                          color=OUTLINE_COLOR, thickness=INNER_THICKNESS,
-                          lineType=cv2.LINE_AA)
-
-            (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-            ty = max(0, y1 - 8)
-            cv2.rectangle(display, (x1, ty - th - 6), (x1 + tw + 6, ty + 4),
-                          (0, 0, 0), -1)
-            cv2.putText(display, text, (x1 + 3, ty), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6, OUTLINE_COLOR, 2, cv2.LINE_AA)
-
-    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-        img = frame.to_ndarray(format="bgr24")
-        display = img.copy()
-
-        self.frame_count += 1
-        if self.frame_count % PROCESS_EVERY_N_FRAMES == 0:
-            self.last_overlays = self._compute_overlays(img)
-
-        self._draw_overlays(display, self.last_overlays)
+                (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                ty = max(0, y1 - 8)
+                cv2.rectangle(display, (x1, ty - th - 6), (x1 + tw + 6, ty + 4),
+                              (0, 0, 0), -1)
+                cv2.putText(display, text, (x1 + 3, ty), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.6, OUTLINE_COLOR, 2, cv2.LINE_AA)
 
         return av.VideoFrame.from_ndarray(display, format="bgr24")
 
