@@ -9,6 +9,8 @@ Gradio 대신 Streamlit + streamlit-webrtc로 작성했습니다.
 - 트랙바(Confidence %, Curve Smooth) -> st.slider로 대체
 """
 
+import time
+
 import av
 import cv2
 import numpy as np
@@ -19,7 +21,7 @@ from ultralytics import YOLO
 YOLO_MODEL_NAME = "yolov8n-seg.pt"  # 가장 가벼운 모델, 속도 최우선
 
 # --- 속도 개선 설정 (속도 최우선, 최대치) ---
-PROCESS_EVERY_N_FRAMES = 1   # 매 프레임마다 추론
+PROCESS_EVERY_N_FRAMES = 4   # 4프레임마다 1번 추론 (버벅임 완화)
 INFER_IMG_SIZE = 640         # YOLO 기본 추론 해상도로 복원
 
 OUTLINE_COLOR = (0, 255, 0)      # BGR
@@ -62,6 +64,8 @@ class SilhouetteProcessor(VideoProcessorBase):
         self.curve_smooth = 9
         self.frame_count = 0
         self.last_overlays = []  # 직전 추론 결과(그릴 항목들) 캐시
+        self.last_time = time.time()
+        self.fps = 0.0
 
     def _compute_overlays(self, img):
         """YOLO 추론을 돌려서 그릴 항목 리스트를 만든다."""
@@ -111,11 +115,20 @@ class SilhouetteProcessor(VideoProcessorBase):
         img = frame.to_ndarray(format="bgr24")
         display = img.copy()
 
+        # FPS 계산 (지수이동평균으로 부드럽게)
+        now = time.time()
+        instant_fps = 1.0 / max(now - self.last_time, 1e-6)
+        self.fps = self.fps * 0.9 + instant_fps * 0.1
+        self.last_time = now
+
         self.frame_count += 1
         if self.frame_count % PROCESS_EVERY_N_FRAMES == 0:
             self.last_overlays = self._compute_overlays(img)
 
         self._draw_overlays(display, self.last_overlays)
+
+        cv2.putText(display, f"FPS: {self.fps:.1f}", (10, display.shape[0] - 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
 
         return av.VideoFrame.from_ndarray(display, format="bgr24")
 
@@ -129,7 +142,7 @@ ctx = webrtc_streamer(
     video_processor_factory=SilhouetteProcessor,
     rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={
-        "video": {"width": {"ideal": 480}, "height": {"ideal": 360}},
+        "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
         "audio": False,
     },
 )
